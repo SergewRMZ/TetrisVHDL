@@ -16,7 +16,7 @@ package Functions is
 
     procedure draw_piece (
         signal piece_matrix: in Piece_Array; 
-        signal x_pos, y_pos: in integer;
+        variable x_pos, y_pos: in integer;
         signal board_aux: out matrix
     );
 
@@ -78,7 +78,7 @@ package body Functions is
     -- Procedimiento para dibujar una pieza en la matriz auxiliar con base en las coordenadas
     procedure draw_piece (
       signal piece_matrix: in Piece_Array; 
-      signal x_pos, y_pos: in integer;
+      variable x_pos, y_pos: in integer;
       signal board_aux: out matrix
       ) is
 		 begin

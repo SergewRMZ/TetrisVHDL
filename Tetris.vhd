@@ -40,8 +40,7 @@ ARCHITECTURE Juego OF Tetris IS
 	-- Pieces
 	SIGNAL current_piece      : Piece_Array;
 	SIGNAL next_piece         : Piece_Array;
-	SIGNAL figure_x, figure_y : INTEGER RANGE 0 TO 8 := 0;
- 
+
 	-- Clock Signals
 	CONSTANT DIVIDER     : INTEGER := 5;
 	SIGNAL shift_counter : INTEGER RANGE 0 TO DIVIDER := 0;
@@ -50,7 +49,7 @@ ARCHITECTURE Juego OF Tetris IS
 BEGIN
 	PROCESS (reset, clk)
 	VARIABLE isCollision : BOOLEAN := false;
-	VARIABLE temp_figure_y : INTEGER;
+	VARIABLE figure_x, figure_y : INTEGER RANGE 0 TO 8 := 0;
 	BEGIN
 		IF (reset = '1') THEN
 			row_sel <= "11111111";
@@ -61,8 +60,8 @@ BEGIN
 				END LOOP;
 			END LOOP;
  
-			figure_x <= 0;
-			figure_y <= 0;
+			figure_x := 0;
+			figure_y := 0;
  
 			-- Cargar pieza inicial
 			current_piece <= PIECE_I;
@@ -92,9 +91,9 @@ BEGIN
 								state_piece <= DRAW;
  
 							WHEN DRAW => 
-								IF figure_y <= 8 THEN
-									figure_y  <= figure_y + 1;
-									draw_piece(current_piece, figure_x, figure_y, board_aux);
+								IF figure_y < 7 THEN
+									figure_y := figure_y + 1;
+									REPORT "Estado Draw con Y = " & INTEGER'IMAGE(figure_Y);									draw_piece(current_piece, figure_x, figure_y, board_aux);
 									state_piece <= DETECT_COLLISION;
 								END IF;
  
@@ -105,16 +104,17 @@ BEGIN
 									state_piece <= CHARGE;
 								ELSE
 									REPORT "COLLISION DETECTADA" SEVERITY note;
-									figure_y <= figure_y - 1;
-									draw_piece(current_piece, figure_x, figure_y, board_aux);
-									state_piece <= CHARGE;
+                  REPORT "Valores antes del cambio: figure_x=" & INTEGER'IMAGE(figure_x) & ", figure_y=" & INTEGER'IMAGE(figure_y) SEVERITY note;
+                  figure_y := figure_y - 2;
+                  REPORT "Valores después del cambio: figure_x=" & INTEGER'IMAGE(figure_x) & ", figure_y=" & INTEGER'IMAGE(figure_y) SEVERITY note;
+                  clearMatAux(board_aux);
+                  state_piece <= DRAW;
 								END IF;
- 
  
 							WHEN CHARGE => 
 								chargePiece(board_aux, board);
  
-								IF figure_y = 8 THEN 
+								IF figure_y = 7 THEN 
 									state <= NEXTFIGURE;
 									state_piece <= CLEAR;
 								ELSE
@@ -127,15 +127,14 @@ BEGIN
 				   CASE state_piece IS
 				     WHEN CLEAR =>
 				       clearMatAux(board_aux);
-				       figure_y <= 0;
-				       figure_x <= 0;
+				       figure_y := 0;
+				       figure_x := 0;
 				       current_piece <= PIECE_L;
 				       state_piece <= DRAW;
 				         
 				     WHEN DRAW =>
 				    
 				       draw_piece(current_piece, figure_x, figure_y, board_aux);
-				       figure_y  <= figure_y + 1;
 				       state_piece <= DETECT_COLLISION;
 				       state <= FALLING;
 				       
@@ -155,3 +154,4 @@ BEGIN
 		END IF; 
 	END PROCESS;
 END ARCHITECTURE Juego;
+
