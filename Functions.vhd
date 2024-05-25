@@ -16,7 +16,7 @@ PACKAGE Functions IS
 
 	PROCEDURE draw_piece (
 		SIGNAL piece_matrix : IN Piece_Array;
-		VARIABLE x_pos, y_pos : IN INTEGER;
+		VARIABLE x_pos, y_pos : INOUT INTEGER;
 		SIGNAL board_aux : OUT matrix
 	);
 
@@ -75,57 +75,80 @@ PACKAGE BODY Functions IS
 	-- Procedimiento para dibujar una pieza en la matriz auxiliar con base en las coordenadas
 	PROCEDURE draw_piece (
 		SIGNAL piece_matrix : IN Piece_Array;
-		VARIABLE x_pos, y_pos : IN INTEGER;
+		VARIABLE x_pos, y_pos : INOUT INTEGER;
 		SIGNAL board_aux : OUT matrix
 	) IS
+		VARIABLE out_of_bounds : BOOLEAN := TRUE;
 	BEGIN
+		WHILE out_of_bounds LOOP
+			out_of_bounds := FALSE;
+			FOR i IN 0 TO 3 LOOP
+					FOR j IN 0 TO 3 LOOP
+							IF piece_matrix(i, j) = '1' THEN
+									IF x_pos + j < 0 THEN
+											REPORT "Un bit de la pieza sale por la izquierda";
+											x_pos := x_pos + 1;
+											out_of_bounds := TRUE;
+									ELSIF x_pos + j >= 8 THEN
+											REPORT "Un bit de la pieza sale por la derecha";
+											x_pos := x_pos - 1;
+											out_of_bounds := TRUE;
+									END IF;
+							END IF;
+						EXIT WHEN out_of_bounds;
+					END LOOP;
+				EXIT WHEN out_of_bounds;
+			END LOOP;
+		END LOOP;
+
 		FOR i IN 0 TO 3 LOOP
 			FOR j IN 0 TO 3 LOOP
 				IF piece_matrix(i, j) = '1' THEN
+
 					IF ((x_pos + j >= 0 AND x_pos + j < 8) AND (y_pos + i >= 0 AND y_pos + i < 8)) THEN
-						-- report "Se detecta un '1' en la pieza (" & integer'image(i) & ", " & integer'image(j) & ")" severity note;
 						board_aux(y_pos + i, x_pos + j) <= '1';
-						-- report "Se carga un '1' (" & integer'image(y_pos + i) & ", " & integer'image(x_pos + j) & "), con pos_y = " & integer'image(y_pos) & " pos_x = " & integer'image(x_pos) severity note;
 					END IF;
+					
+				END IF;
+			END LOOP;
+		END LOOP;
+
+	END PROCEDURE;
+
+	-- Procedimiento para cargar una pieza en el tablero principal
+	PROCEDURE chargePiece (
+		SIGNAL board_aux : IN matrix;
+		SIGNAL board : OUT matrix
+	) IS
+	BEGIN
+		FOR i IN 0 TO 7 LOOP
+			FOR j IN 0 TO 7 LOOP
+				IF (board_aux(i, j) = '1') THEN
+					board(i, j) <= '1';
 				END IF;
 			END LOOP;
 		END LOOP;
 	END PROCEDURE;
 
-		-- Procedimiento para cargar una pieza en el tablero principal
-		PROCEDURE chargePiece (
-			SIGNAL board_aux : IN matrix;
-			SIGNAL board : OUT matrix
-		) IS
-		BEGIN
-			FOR i IN 0 TO 7 LOOP
-				FOR j IN 0 TO 7 LOOP
-					IF (board_aux(i, j) = '1') THEN
-						board(i, j) <= '1';
-					END IF;
-				END LOOP;
+	-- Limpiar pieza
+	PROCEDURE clearPiece (SIGNAL board, board_aux : INOUT matrix) IS BEGIN
+		FOR i IN 0 TO 7 LOOP
+			FOR j IN 0 TO 7 LOOP
+				IF board(i, j) = '1' AND board_aux (i, j) = '1' THEN
+					board(i, j) <= '0'; -- Limpiar pieza
+				END IF;
 			END LOOP;
-		END PROCEDURE;
+		END LOOP;
+	END PROCEDURE;
 
-		-- Limpiar pieza
-		PROCEDURE clearPiece (SIGNAL board, board_aux : INOUT matrix) IS BEGIN
-			FOR i IN 0 TO 7 LOOP
-				FOR j IN 0 TO 7 LOOP
-					IF board(i, j) = '1' AND board_aux (i, j) = '1' THEN
-						board(i, j) <= '0'; -- Limpiar pieza
-					END IF;
-				END LOOP;
+	PROCEDURE clearMatAux(SIGNAL board_aux : INOUT matrix) IS BEGIN
+		FOR i IN 0 TO 7 LOOP
+			FOR j IN 0 TO 7 LOOP
+				IF board_aux (i, j) = '1' THEN
+					board_aux(i, j) <= '0'; -- Limpiar pieza
+				END IF;
 			END LOOP;
-		END PROCEDURE;
+		END LOOP;
+	END PROCEDURE;
 
-		PROCEDURE clearMatAux(SIGNAL board_aux : INOUT matrix) IS BEGIN
-			FOR i IN 0 TO 7 LOOP
-				FOR j IN 0 TO 7 LOOP
-					IF board_aux (i, j) = '1' THEN
-						board_aux(i, j) <= '0'; -- Limpiar pieza
-					END IF;
-				END LOOP;
-			END LOOP;
-		END PROCEDURE;
-
-	END PACKAGE BODY;
+END PACKAGE BODY;

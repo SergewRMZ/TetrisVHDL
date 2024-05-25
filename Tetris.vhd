@@ -3,13 +3,7 @@ USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.NUMERIC_STD.ALL;
 USE work.Pieces.ALL;
 USE work.Functions.ALL;
-
-
 ENTITY Tetris IS
-	GENERIC (
-		SCREEN_WIDTH : INTEGER := 8;
-		SCREEN_HEIGHT : INTEGER := 8
-	);
 	PORT (
 		clk : IN STD_LOGIC;
 		reset : IN STD_LOGIC;
@@ -36,50 +30,52 @@ ARCHITECTURE Juego OF Tetris IS
 
 	-- Matriz de Leds
 	SIGNAL row_index : INTEGER := 0;
-	SIGNAL update_board : BOOLEAN := false;
 
 	-- Pieces
 	SIGNAL current_piece : Piece_Array;
 	SIGNAL next_piece : Piece_Array;
 
 	-- Clock Signals
-	CONSTANT DIVIDER : INTEGER := 5;
-	SIGNAL shift_counter : INTEGER RANGE 0 TO DIVIDER := 0;
 	SIGNAL shift_clock : STD_LOGIC := '0';
-
+	SIGNAL init_complete : BOOLEAN := false;
 	-- Señales de debouncer
 	SIGNAL right_debounced : STD_LOGIC := '0';
 	SIGNAL left_debounced : STD_LOGIC := '0';
 
-	-- Instancias de debouncer
+	---------------------------------------------------------------------------------
+	-- COMPONENTES
 	COMPONENT Debouncer IS
-			PORT (
-					clk : IN STD_LOGIC;
-					input_signal : IN STD_LOGIC;
-					debounced_output : OUT STD_LOGIC
-			);
+		PORT (
+			clk : IN STD_LOGIC;
+			input_signal : IN STD_LOGIC;
+			debounced_output : OUT STD_LOGIC
+		);
 	END COMPONENT;
 
-	
-	SHARED VARIABLE figure_x, figure_y : INTEGER RANGE 0 TO 8 := 0;
+	COMPONENT Divider IS
+		PORT (
+			clk : IN STD_LOGIC;
+			clk_divider : OUT STD_LOGIC
+		);
+	END COMPONENT;
+
+	---------------------------------------------------------------------------------
+	-- VARIABLES COPMPARTIDAS
+	SHARED VARIABLE figure_y : INTEGER RANGE 0 TO 8 := 0;
+	SHARED VARIABLE figure_x : INTEGER range -2 TO 8 := 0;
+	---------------------------------------------------------------------------------
+
+	---------------------------------------------------------------------------------
+	----- INICIO DE LA ARQUITECTURA
+
 BEGIN
+	frecuency_divider : Divider PORT MAP(clk => clk, clk_divider => shift_clock);
 
-	right_debouncer_instancia: Debouncer PORT MAP (
-		clk => clk,
-		input_signal => right_btn,
-		debounced_output => right_debounced
-	);
-
-	left_debouncer_instancia: Debouncer PORT MAP (
-		clk => clk,
-		input_signal => left_btn,
-		debounced_output => left_debounced
-	);
-	
-	PROCESS (reset, clk)
+	JUEGO_TETRIS : PROCESS (reset, clk, shift_clock)
 		VARIABLE isCollision : BOOLEAN := false;
 	BEGIN
-		IF (reset = '1') THEN
+		IF reset = '1' THEN
+			REPORT "INICIANDO JUEGO";
 			row_sel <= "11111111";
 			FOR i IN 0 TO 7 LOOP
 				FOR j IN 0 TO 7 LOOP
@@ -97,112 +93,114 @@ BEGIN
 			-- Dibujar la pieza inicial en el tablero (por ejemplo, en la fila 0, columna 3)
 			draw_piece(current_piece, figure_x, figure_y, board_aux);
 			chargePiece(board_aux, board);
-			state <= FALLING;
-			update_board <= true;
 
 		ELSIF rising_edge(clk) THEN
-			IF left_debounced = '1' AND figure_x > 0 THEN
-				figure_x := figure_x - 1;
-				REPORT "Izquierda: (" & INTEGER'IMAGE(figure_x) & ")";
-
-			ELSIF right_debounced = '1' AND figure_x < 7 THEN
-				figure_x := figure_x + 1;
-				REPORT "Derecha: (" & INTEGER'IMAGE(figure_x) & ")";
+			IF right_btn = '1' THEN
+				IF figure_x < 7 THEN
+				  figure_x := figure_x + 1; 
+				  REPORT "Derecha -> X = " & INTEGER'IMAGE(figure_x);
+				END IF;
 			END IF;
+			
+			IF left_btn = '1' THEN 
+			  IF figure_x > -2 THEN
+			   figure_x := figure_x - 1;
+			   REPORT "Izquierda <- X = " & INTEGER'IMAGE(figure_x);
+			  END IF;
+			END IF;
+			
+			repaint(row_index, col_sel, row_sel, board);
 
-			IF shift_counter = DIVIDER THEN
-				shift_counter <= 0;
-				shift_clock <= NOT shift_clock;
-				clk_desp <= shift_clock;
+		ELSIF rising_edge(shift_clock) THEN
+			CASE state IS
+				WHEN INIT =>
+					state <= FALLING;
 
-				CASE state IS
-					WHEN FALLING =>
-						CASE state_piece IS
-							WHEN ESPERA =>
-								state_piece <= CLEAR;
+				WHEN FALLING =>
+					CASE state_piece IS
+						WHEN ESPERA =>
+							state_piece <= CLEAR;
 
-							WHEN CLEAR =>
-								clearPiece(board, board_aux);
-								clearMatAux(board_aux);
-								state_piece <= DRAW;
+						WHEN CLEAR =>
+							clearPiece(board, board_aux);
+							clearMatAux(board_aux);
+							state_piece <= DRAW;
 
-							WHEN DRAW =>
-								IF figure_y < 7 THEN
-									figure_y := figure_y + 1;
-									REPORT "Estado Draw con Y = " & INTEGER'IMAGE(figure_Y);
-									draw_piece(current_piece, figure_x, figure_y, board_aux);
-									state_piece <= DETECT_COLLISION;
-								END IF;
-							WHEN DETECT_COLLISION =>
-								isCollision := check_collision(board_aux, board);
-								IF NOT isCollision THEN
-									state_piece <= CHARGE;
-
-								ELSE
-									REPORT "COLLISION DETECTADA" SEVERITY note;
-									state <= SOLVE_COLLISION;
-									state_piece <= CLEAR;
-								END IF;
-
-							WHEN CHARGE =>
-								chargePiece(board_aux, board);
-								-- La pieza ha llegado al fin
-								IF figure_y = 7 THEN
-									state <= NEXTFIGURE;
-									state_piece <= CLEAR;
-
-								ELSE
-									state_piece <= ESPERA;
-								END IF;
-
-						END CASE;
-
-					WHEN NEXTFIGURE =>
-						CASE state_piece IS
-							WHEN CLEAR =>
-								clearMatAux(board_aux);
-								figure_y := 0;
-								figure_x := 0;
-								current_piece <= PIECE_L;
-								state_piece <= DRAW;
-
-							WHEN DRAW =>
+						WHEN DRAW =>
+							IF figure_y < 7 THEN
+								figure_y := figure_y + 1;
+								REPORT "Estado Draw con Y = " & INTEGER'IMAGE(figure_Y);
 								draw_piece(current_piece, figure_x, figure_y, board_aux);
 								state_piece <= DETECT_COLLISION;
-								state <= FALLING;
-
-							WHEN OTHERS => NULL;
-						END CASE;
-
-					WHEN SOLVE_COLLISION =>
-						CASE state_piece IS
-							WHEN CLEAR =>
-								figure_y := figure_y - 1; -- Retroceder la pieza
-								REPORT "Retrocede al último estado: figure_x=" & INTEGER'IMAGE(figure_x) & ", figure_y=" & INTEGER'IMAGE(figure_y) SEVERITY note;
-								clearMatAux(board_aux);
-								state_piece <= DRAW;
-
-							WHEN DRAW =>
-								draw_piece(current_piece, figure_x, figure_y, board_aux);
+							END IF;
+						WHEN DETECT_COLLISION =>
+							isCollision := check_collision(board_aux, board);
+							IF NOT isCollision THEN
 								state_piece <= CHARGE;
 
-							WHEN CHARGE =>
-								chargePiece(board_aux, board);
+							ELSE
+								REPORT "COLLISION DETECTADA" SEVERITY note;
+								state <= SOLVE_COLLISION;
+								state_piece <= CLEAR;
+							END IF;
+
+						WHEN CHARGE =>
+							chargePiece(board_aux, board);
+							-- La pieza ha llegado al fin
+							IF figure_y = 7 THEN
 								state <= NEXTFIGURE;
 								state_piece <= CLEAR;
 
-							WHEN OTHERS => NULL;
+							ELSE
+								state_piece <= ESPERA;
+							END IF;
 
-						END CASE;
+					END CASE;
 
-					WHEN OTHERS => NULL;
-				END CASE;
+				WHEN NEXTFIGURE =>
+					CASE state_piece IS
+						WHEN CLEAR =>
+							clearMatAux(board_aux);
+							figure_y := 0;
+							figure_x := 0;
+							current_piece <= PIECE_I;
+							state_piece <= DRAW;
 
-			ELSE
-				shift_counter <= shift_counter + 1;
-				repaint(row_index, col_sel, row_sel, board);
+						WHEN DRAW =>
+							draw_piece(current_piece, figure_x, figure_y, board_aux);
+							state_piece <= DETECT_COLLISION;
+							state <= FALLING;
 
-			END IF;
+						WHEN OTHERS => NULL;
+					END CASE;
+
+				WHEN SOLVE_COLLISION =>
+					CASE state_piece IS
+						WHEN CLEAR =>
+							figure_y := figure_y - 1; -- Retroceder la pieza
+							REPORT "Retrocede al último estado: figure_x=" & INTEGER'IMAGE(figure_x) & ", figure_y=" & INTEGER'IMAGE(figure_y) SEVERITY note;
+							clearMatAux(board_aux);
+							state_piece <= DRAW;
+
+						WHEN DRAW =>
+							draw_piece(current_piece, figure_x, figure_y, board_aux);
+							state_piece <= CHARGE;
+
+						WHEN CHARGE =>
+							chargePiece(board_aux, board);
+							state <= NEXTFIGURE;
+							state_piece <= CLEAR;
+
+						WHEN OTHERS => NULL;
+
+					END CASE;
+				WHEN OTHERS => NULL;
+			END CASE;
+
+
 		END IF;
 	END PROCESS;
-END ARCHITECTURE Juego;
+	
+	clk_desp <= shift_clock;
+
+	END ARCHITECTURE Juego;
