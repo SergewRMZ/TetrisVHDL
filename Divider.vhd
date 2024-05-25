@@ -9,7 +9,7 @@ ENTITY Divider IS
 END ENTITY Divider;
 
 ARCHITECTURE FrecuencyDivisor OF Divider IS
-    CONSTANT DIVIDER : INTEGER := 2;
+    CONSTANT DIVIDER : INTEGER := 4;
     SIGNAL counter : INTEGER range 0 to DIVIDER := 0;
     SIGNAL clk_state : STD_LOGIC := '0';
 

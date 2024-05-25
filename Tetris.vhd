@@ -10,7 +10,7 @@ ENTITY Tetris IS
 		right_btn : IN STD_LOGIC;
 		left_btn : IN STD_LOGIC;
 		rotate_right_btn : IN STD_LOGIC;
-		rotate_left_btn: IN STD_LOGIC;
+		rotate_left_btn : IN STD_LOGIC;
 		-- Salidas
 		row_sel : OUT STD_LOGIC_VECTOR(0 TO 7);
 		col_sel : OUT STD_LOGIC_VECTOR (0 TO 7);
@@ -63,7 +63,7 @@ ARCHITECTURE Juego OF Tetris IS
 	---------------------------------------------------------------------------------
 	-- VARIABLES COPMPARTIDAS
 	SHARED VARIABLE figure_y : INTEGER RANGE 0 TO 8 := 0;
-	SHARED VARIABLE figure_x : INTEGER range -2 TO 8 := 0;
+	SHARED VARIABLE figure_x : INTEGER RANGE -2 TO 8 := 0;
 	---------------------------------------------------------------------------------
 
 	---------------------------------------------------------------------------------
@@ -84,59 +84,37 @@ BEGIN
 					board_aux(i, j) <= '0';
 				END LOOP;
 			END LOOP;
-			
+
 			board(7, 0) <= '1';
 			board(7, 1) <= '1';
 			board(7, 2) <= '1';
 			board(7, 3) <= '1';
-      
-      board(6, 0) <= '1';
+
+			board(6, 0) <= '1';
 			board(6, 1) <= '1';
 			board(6, 2) <= '1';
 			board(6, 3) <= '1';
-			
+
 			board(7, 4) <= '1';
 			board(6, 4) <= '1';
 			board(5, 4) <= '1';
 			board(4, 4) <= '1';
+
+			board(5, 1) <= '1';
+			board(5, 2) <= '1';
+			board(4, 1) <= '1';
+			board(3, 1) <= '1';
 			figure_x := 0;
 			figure_y := 0;
 
 			-- Cargar pieza inicial
-			current_piece <= PIECE_I;
+			current_piece <= PIECE_L;
 
 			-- Dibujar la pieza inicial en el tablero (por ejemplo, en la fila 0, columna 3)
 			draw_piece(current_piece, figure_x, figure_y, board_aux);
 			chargePiece(board_aux, board);
 
 		ELSIF rising_edge(clk) THEN
-			IF right_btn = '1' THEN
-				IF figure_x < 7 THEN
-				  figure_x := figure_x + 1; 
-				  REPORT "Derecha -> X = " & INTEGER'IMAGE(figure_x);
-				END IF;
-			END IF;
-			
-			IF left_btn = '1' THEN 
-			  IF figure_x > -2 THEN
-			   figure_x := figure_x - 1;
-			   REPORT "Izquierda <- X = " & INTEGER'IMAGE(figure_x);
-			  END IF;
-			END IF;
-			
-			IF rotate_right_btn = '1' THEN
-			   state <= ROTATION;
-			   state_piece <= ROTATE_RIGHT;
-			END IF;
-			
-			IF rotate_left_btn = '1' THEN
-			  state <= ROTATION;
-			  state_piece <= ROTATE_LEFT;
-			END IF;
-			
-			repaint(row_index, col_sel, row_sel, board);
-
-		ELSIF rising_edge(shift_clock) THEN
 			CASE state IS
 				WHEN INIT =>
 					state <= FALLING;
@@ -153,8 +131,6 @@ BEGIN
 
 						WHEN DRAW =>
 							IF figure_y < 7 THEN
-								figure_y := figure_y + 1;
-								REPORT "Estado Draw con Y = " & INTEGER'IMAGE(figure_Y);
 								draw_piece(current_piece, figure_x, figure_y, board_aux);
 								state_piece <= DETECT_COLLISION;
 							END IF;
@@ -171,7 +147,7 @@ BEGIN
 
 						WHEN CHARGE =>
 							chargePiece(board_aux, board);
-							REPORT "Cargando pieza en (" &INTEGER'IMAGE(figure_y) & ")" & "(" & INTEGER'IMAGE(figure_x) & ")";
+							REPORT "Cargando pieza en (" & INTEGER'IMAGE(figure_y) & ")" & "(" & INTEGER'IMAGE(figure_x) & ")";
 							IF figure_y = 7 THEN
 								state <= NEXTFIGURE;
 								state_piece <= CLEAR;
@@ -189,7 +165,7 @@ BEGIN
 							clearMatAux(board_aux);
 							figure_y := 0;
 							figure_x := 0;
-							current_piece <= PIECE_I;
+							current_piece <= PIECE_S;
 							state_piece <= DRAW;
 
 						WHEN DRAW =>
@@ -203,7 +179,13 @@ BEGIN
 				WHEN SOLVE_COLLISION =>
 					CASE state_piece IS
 						WHEN CLEAR =>
-							figure_y := figure_y - 1; -- Retroceder la pieza
+							IF figure_y > 0 THEN
+								figure_y := figure_y - 1; -- Retroceder la pieza
+							ELSE
+								-- De estar en el estado de colision en y = 0, fin del juego.
+								state <= GAME_OVER;
+								REPORT "FIN DEL JUEGO";
+							END IF;
 							REPORT "Retrocede al último estado: figure_x=" & INTEGER'IMAGE(figure_x) & ", figure_y=" & INTEGER'IMAGE(figure_y) SEVERITY note;
 							clearMatAux(board_aux);
 							state_piece <= DRAW;
@@ -222,23 +204,61 @@ BEGIN
 					END CASE;
 
 				WHEN ROTATION =>
-					CASE state_piece is
+					CASE state_piece IS
 						WHEN ROTATE_LEFT =>
 							current_piece <= rotateLeft(current_piece);
 							state <= FALLING;
 							state_piece <= CLEAR;
-							
+
 						WHEN ROTATE_RIGHT =>
-						  current_piece <= rotateRight(current_piece);
-						  state <= FALLING;
-						  state_piece <= CLEAR;
+							current_piece <= rotateRight(current_piece);
+							state <= FALLING;
+							state_piece <= CLEAR;
 						WHEN OTHERS => NULL;
 					END CASE;
+
+				WHEN GAME_OVER =>
+					FOR i IN 0 TO 7 LOOP
+						FOR j IN 0 TO 7 LOOP
+							board(i, j) <= '1';
+						END LOOP;
+					END LOOP;
 				WHEN OTHERS => NULL;
 			END CASE;
+
+			IF right_btn = '1' THEN
+				IF figure_x < 7 THEN
+					figure_x := figure_x + 1;
+					REPORT "Derecha -> X = " & INTEGER'IMAGE(figure_x);
+				END IF;
+			END IF;
+
+			IF left_btn = '1' THEN
+				IF figure_x >- 2 THEN
+					figure_x := figure_x - 1;
+					REPORT "Izquierda <- X = " & INTEGER'IMAGE(figure_x);
+				END IF;
+			END IF;
+
+			IF rotate_right_btn = '1' THEN
+				state <= ROTATION;
+				state_piece <= ROTATE_RIGHT;
+			END IF;
+
+			IF rotate_left_btn = '1' THEN
+				state <= ROTATION;
+				state_piece <= ROTATE_LEFT;
+			END IF;
+			repaint(row_index, col_sel, row_sel, board);
+
+
+			
+		ELSIF rising_edge(shift_clock) THEN
+			figure_y := figure_y + 1;
+			REPORT "Pieza desciende";
 		END IF;
 	END PROCESS;
-	
+
 	clk_desp <= shift_clock;
 
-	END ARCHITECTURE Juego;
+END ARCHITECTURE Juego;
