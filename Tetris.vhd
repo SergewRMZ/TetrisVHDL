@@ -9,7 +9,8 @@ ENTITY Tetris IS
 		reset : IN STD_LOGIC;
 		right_btn : IN STD_LOGIC;
 		left_btn : IN STD_LOGIC;
-		rotate_btn : IN STD_LOGIC;
+		rotate_right_btn : IN STD_LOGIC;
+		rotate_left_btn: IN STD_LOGIC;
 		-- Salidas
 		row_sel : OUT STD_LOGIC_VECTOR(0 TO 7);
 		col_sel : OUT STD_LOGIC_VECTOR (0 TO 7);
@@ -22,10 +23,10 @@ ARCHITECTURE Juego OF Tetris IS
 	SIGNAL board_aux : matrix;
 
 	-- State Machines
-	TYPE State_Type IS (INIT, FALLING, SOLVE_COLLISION, GAME_OVER, NEXTFIGURE);
+	TYPE State_Type IS (INIT, FALLING, SOLVE_COLLISION, GAME_OVER, NEXTFIGURE, ROTATION);
 	SIGNAL state : State_Type := INIT;
 
-	TYPE Action_State_Type IS (ESPERA, CLEAR, DRAW, CHARGE, DETECT_COLLISION);
+	TYPE Action_State_Type IS (ESPERA, CLEAR, DRAW, CHARGE, DETECT_COLLISION, ROTATE_LEFT, ROTATE_RIGHT);
 	SIGNAL state_piece : Action_State_Type := ESPERA;
 
 	-- Matriz de Leds
@@ -83,7 +84,21 @@ BEGIN
 					board_aux(i, j) <= '0';
 				END LOOP;
 			END LOOP;
-
+			
+			board(7, 0) <= '1';
+			board(7, 1) <= '1';
+			board(7, 2) <= '1';
+			board(7, 3) <= '1';
+      
+      board(6, 0) <= '1';
+			board(6, 1) <= '1';
+			board(6, 2) <= '1';
+			board(6, 3) <= '1';
+			
+			board(7, 4) <= '1';
+			board(6, 4) <= '1';
+			board(5, 4) <= '1';
+			board(4, 4) <= '1';
 			figure_x := 0;
 			figure_y := 0;
 
@@ -107,6 +122,16 @@ BEGIN
 			   figure_x := figure_x - 1;
 			   REPORT "Izquierda <- X = " & INTEGER'IMAGE(figure_x);
 			  END IF;
+			END IF;
+			
+			IF rotate_right_btn = '1' THEN
+			   state <= ROTATION;
+			   state_piece <= ROTATE_RIGHT;
+			END IF;
+			
+			IF rotate_left_btn = '1' THEN
+			  state <= ROTATION;
+			  state_piece <= ROTATE_LEFT;
 			END IF;
 			
 			repaint(row_index, col_sel, row_sel, board);
@@ -146,7 +171,7 @@ BEGIN
 
 						WHEN CHARGE =>
 							chargePiece(board_aux, board);
-							-- La pieza ha llegado al fin
+							REPORT "Cargando pieza en (" &INTEGER'IMAGE(figure_y) & ")" & "(" & INTEGER'IMAGE(figure_x) & ")";
 							IF figure_y = 7 THEN
 								state <= NEXTFIGURE;
 								state_piece <= CLEAR;
@@ -154,6 +179,7 @@ BEGIN
 							ELSE
 								state_piece <= ESPERA;
 							END IF;
+						WHEN OTHERS => NULL;
 
 					END CASE;
 
@@ -194,10 +220,22 @@ BEGIN
 						WHEN OTHERS => NULL;
 
 					END CASE;
+
+				WHEN ROTATION =>
+					CASE state_piece is
+						WHEN ROTATE_LEFT =>
+							current_piece <= rotateLeft(current_piece);
+							state <= FALLING;
+							state_piece <= CLEAR;
+							
+						WHEN ROTATE_RIGHT =>
+						  current_piece <= rotateRight(current_piece);
+						  state <= FALLING;
+						  state_piece <= CLEAR;
+						WHEN OTHERS => NULL;
+					END CASE;
 				WHEN OTHERS => NULL;
 			END CASE;
-
-
 		END IF;
 	END PROCESS;
 	

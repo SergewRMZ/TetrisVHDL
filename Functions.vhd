@@ -33,122 +33,159 @@ PACKAGE Functions IS
 
 	PROCEDURE clearMatAux(SIGNAL board_aux : INOUT matrix);
 
-END PACKAGE;
+	FUNCTION rotateLeft (piece_matrix : IN Piece_Array) RETURN Piece_Array;
+	FUNCTION rotateRight (piece_matrix : IN Piece_Array) RETURN Piece_Array;
 
-PACKAGE BODY Functions IS
-	PROCEDURE repaint (
-		SIGNAL row_index : INOUT INTEGER;
-		SIGNAL col_sel : OUT STD_LOGIC_VECTOR(0 TO 7);
-		SIGNAL row_sel : OUT STD_LOGIC_VECTOR(0 TO 7);
-		SIGNAL board : IN matrix) IS
-	BEGIN
+		END PACKAGE;
 
-		row_sel <= (OTHERS => '1');
-		row_sel(row_index) <= '0';
+		PACKAGE BODY Functions IS
+			PROCEDURE repaint (
+				SIGNAL row_index : INOUT INTEGER;
+				SIGNAL col_sel : OUT STD_LOGIC_VECTOR(0 TO 7);
+				SIGNAL row_sel : OUT STD_LOGIC_VECTOR(0 TO 7);
+				SIGNAL board : IN matrix) IS
+			BEGIN
 
-		-- Asignar los valores de la fila seleccionada a col_sel
-		FOR j IN 0 TO 7 LOOP
-			col_sel(j) <= board(row_index, j);
-		END LOOP;
+				row_sel <= (OTHERS => '1');
+				row_sel(row_index) <= '0';
 
-		-- Incrementar row_index y resetearlo si alcanza el valor 8
-		row_index <= row_index + 1;
-		IF row_index = 7 THEN
-			row_index <= 0;
-		END IF;
-	END PROCEDURE;
-	FUNCTION check_collision (SIGNAL board_aux : IN matrix; SIGNAL board : IN matrix) RETURN BOOLEAN IS
-	BEGIN
-		FOR i IN 0 TO 7 LOOP
-			FOR j IN 0 TO 7 LOOP
-				IF board_aux(i, j) = '1' THEN
-					IF board(i, j) = '1' THEN
-						RETURN true;
-					END IF;
+				-- Asignar los valores de la fila seleccionada a col_sel
+				FOR j IN 0 TO 7 LOOP
+					col_sel(j) <= board(row_index, j);
+				END LOOP;
+
+				-- Incrementar row_index y resetearlo si alcanza el valor 8
+				row_index <= row_index + 1;
+				IF row_index = 7 THEN
+					row_index <= 0;
 				END IF;
-			END LOOP;
-		END LOOP;
-
-		RETURN false; -- No hay colisiones
-	END FUNCTION;
-
-	-- Procedimiento para dibujar una pieza en la matriz auxiliar con base en las coordenadas
-	PROCEDURE draw_piece (
-		SIGNAL piece_matrix : IN Piece_Array;
-		VARIABLE x_pos, y_pos : INOUT INTEGER;
-		SIGNAL board_aux : OUT matrix
-	) IS
-		VARIABLE out_of_bounds : BOOLEAN := TRUE;
-	BEGIN
-		WHILE out_of_bounds LOOP
-			out_of_bounds := FALSE;
-			FOR i IN 0 TO 3 LOOP
-					FOR j IN 0 TO 3 LOOP
-							IF piece_matrix(i, j) = '1' THEN
-									IF x_pos + j < 0 THEN
-											REPORT "Un bit de la pieza sale por la izquierda";
-											x_pos := x_pos + 1;
-											out_of_bounds := TRUE;
-									ELSIF x_pos + j >= 8 THEN
-											REPORT "Un bit de la pieza sale por la derecha";
-											x_pos := x_pos - 1;
-											out_of_bounds := TRUE;
-									END IF;
+			END PROCEDURE;
+			FUNCTION check_collision (SIGNAL board_aux : IN matrix; SIGNAL board : IN matrix) RETURN BOOLEAN IS
+			BEGIN
+				FOR i IN 0 TO 7 LOOP
+					FOR j IN 0 TO 7 LOOP
+						IF board_aux(i, j) = '1' THEN
+							IF board(i, j) = '1' THEN
+								RETURN true;
 							END IF;
+						END IF;
+					END LOOP;
+				END LOOP;
+
+				RETURN false; -- No hay colisiones
+			END FUNCTION;
+
+			-- Procedimiento para dibujar una pieza en la matriz auxiliar con base en las coordenadas
+			PROCEDURE draw_piece (
+				SIGNAL piece_matrix : IN Piece_Array;
+				VARIABLE x_pos, y_pos : INOUT INTEGER;
+				SIGNAL board_aux : OUT matrix
+			) IS
+				VARIABLE out_of_bounds : BOOLEAN := TRUE;
+			BEGIN
+				WHILE out_of_bounds LOOP
+					out_of_bounds := FALSE;
+					FOR i IN 0 TO 3 LOOP
+						FOR j IN 0 TO 3 LOOP
+							IF piece_matrix(i, j) = '1' THEN
+
+								IF x_pos + j < 0 THEN
+									REPORT "Un bit de la pieza sale por la izquierda";
+									x_pos := x_pos + 1;
+									out_of_bounds := TRUE;
+
+								ELSIF x_pos + j >= 8 THEN
+									REPORT "Un bit de la pieza sale por la derecha";
+									x_pos := x_pos - 1;
+									out_of_bounds := TRUE;
+								
+								ELSIF y_pos + i >= 8 THEN
+								  REPORT "Un bit de la pieza ha llegado al final";
+								  y_pos := y_pos - 1;
+								  out_of_bounds := TRUE;
+									
+								END IF;
+								
+								
+							END IF;
+							EXIT WHEN out_of_bounds;
+						END LOOP;
 						EXIT WHEN out_of_bounds;
 					END LOOP;
-				EXIT WHEN out_of_bounds;
-			END LOOP;
-		END LOOP;
+				END LOOP;
 
-		FOR i IN 0 TO 3 LOOP
-			FOR j IN 0 TO 3 LOOP
-				IF piece_matrix(i, j) = '1' THEN
+				FOR i IN 0 TO 3 LOOP
+					FOR j IN 0 TO 3 LOOP
+						IF piece_matrix(i, j) = '1' THEN
 
-					IF ((x_pos + j >= 0 AND x_pos + j < 8) AND (y_pos + i >= 0 AND y_pos + i < 8)) THEN
-						board_aux(y_pos + i, x_pos + j) <= '1';
-					END IF;
-					
-				END IF;
-			END LOOP;
-		END LOOP;
+							IF ((x_pos + j >= 0 AND x_pos + j < 8) AND (y_pos + i >= 0 AND y_pos + i < 8)) THEN
+								board_aux(y_pos + i, x_pos + j) <= '1';
+							END IF;
 
-	END PROCEDURE;
+						END IF;
+					END LOOP;
+				END LOOP;
 
-	-- Procedimiento para cargar una pieza en el tablero principal
-	PROCEDURE chargePiece (
-		SIGNAL board_aux : IN matrix;
-		SIGNAL board : OUT matrix
-	) IS
-	BEGIN
-		FOR i IN 0 TO 7 LOOP
-			FOR j IN 0 TO 7 LOOP
-				IF (board_aux(i, j) = '1') THEN
-					board(i, j) <= '1';
-				END IF;
-			END LOOP;
-		END LOOP;
-	END PROCEDURE;
+			END PROCEDURE;
 
-	-- Limpiar pieza
-	PROCEDURE clearPiece (SIGNAL board, board_aux : INOUT matrix) IS BEGIN
-		FOR i IN 0 TO 7 LOOP
-			FOR j IN 0 TO 7 LOOP
-				IF board(i, j) = '1' AND board_aux (i, j) = '1' THEN
-					board(i, j) <= '0'; -- Limpiar pieza
-				END IF;
-			END LOOP;
-		END LOOP;
-	END PROCEDURE;
+			-- Procedimiento para cargar una pieza en el tablero principal
+			PROCEDURE chargePiece (
+				SIGNAL board_aux : IN matrix;
+				SIGNAL board : OUT matrix
+			) IS
+			BEGIN
+				FOR i IN 0 TO 7 LOOP
+					FOR j IN 0 TO 7 LOOP
+						IF (board_aux(i, j) = '1') THEN
+							board(i, j) <= '1';
+						END IF;
+					END LOOP;
+				END LOOP;
+			END PROCEDURE;
 
-	PROCEDURE clearMatAux(SIGNAL board_aux : INOUT matrix) IS BEGIN
-		FOR i IN 0 TO 7 LOOP
-			FOR j IN 0 TO 7 LOOP
-				IF board_aux (i, j) = '1' THEN
-					board_aux(i, j) <= '0'; -- Limpiar pieza
-				END IF;
-			END LOOP;
-		END LOOP;
-	END PROCEDURE;
+			-- Limpiar pieza
+			PROCEDURE clearPiece (SIGNAL board, board_aux : INOUT matrix) IS BEGIN
+				FOR i IN 0 TO 7 LOOP
+					FOR j IN 0 TO 7 LOOP
+						IF board(i, j) = '1' AND board_aux (i, j) = '1' THEN
+							board(i, j) <= '0'; -- Limpiar pieza
+						END IF;
+					END LOOP;
+				END LOOP;
+			END PROCEDURE;
 
-END PACKAGE BODY;
+			PROCEDURE clearMatAux(SIGNAL board_aux : INOUT matrix) IS BEGIN
+				FOR i IN 0 TO 7 LOOP
+					FOR j IN 0 TO 7 LOOP
+						IF board_aux (i, j) = '1' THEN
+							board_aux(i, j) <= '0'; -- Limpiar pieza
+						END IF;
+					END LOOP;
+				END LOOP;
+			END PROCEDURE;
+
+			FUNCTION rotateLeft (piece_matrix : IN Piece_Array) RETURN Piece_Array is
+				VARIABLE rotated: Piece_Array;	
+			BEGIN
+				FOR i in 0 to 3 LOOP
+					for j in 0 to 3 loop
+						rotated(i, j) := piece_matrix(j, 3-i);	
+					end loop;
+				end loop;
+
+				RETURN rotated;
+			END FUNCTION;
+			
+			FUNCTION rotateRight (piece_matrix : IN Piece_Array) RETURN Piece_Array is
+				VARIABLE rotated: Piece_Array;	
+			BEGIN
+				FOR i in 0 to 3 LOOP
+					for j in 0 to 3 loop
+						rotated(i, j) := piece_matrix(3-j, i);	
+					end loop;
+				end loop;
+
+				RETURN rotated;
+			END FUNCTION;
+
+			END PACKAGE BODY;
