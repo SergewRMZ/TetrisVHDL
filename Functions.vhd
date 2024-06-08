@@ -5,7 +5,7 @@ USE work.Pieces.ALL;
 PACKAGE Functions IS
 	TYPE matrix IS ARRAY (0 TO 7, 0 TO 7) OF STD_LOGIC;
 
-	-- Procedimiento para repintar la matriz de leds (fÃƒÆ’Ã‚Â­sica)
+
 	PROCEDURE repaint (
 		SIGNAL row_index : INOUT INTEGER;
 		SIGNAL col_sel : OUT STD_LOGIC_VECTOR(0 TO 7);
@@ -32,11 +32,20 @@ PACKAGE Functions IS
 	);
 
 	PROCEDURE clearMatAux(SIGNAL board_aux : INOUT matrix);
-
+	
+  FUNCTION canMoveRight (
+        piece_matrix: IN Piece_Array;
+        x_pos: IN INTEGER;
+        y_pos: IN INTEGER;
+        board: IN matrix
+    ) RETURN BOOLEAN;
 	FUNCTION rotateLeft (piece_matrix : IN Piece_Array) RETURN Piece_Array;
 	FUNCTION rotateRight (piece_matrix : IN Piece_Array) RETURN Piece_Array;
-
+	PROCEDURE verifyLines (SIGNAL board: INOUT matrix; SIGNAL lines: INOUT INTEGER);
+   
 		END PACKAGE;
+
+-----------------------------------------------------------------------------------------------------------
 
 		PACKAGE BODY Functions IS
 			PROCEDURE repaint (
@@ -81,45 +90,25 @@ PACKAGE Functions IS
 				VARIABLE x_pos, y_pos : INOUT INTEGER;
 				SIGNAL board_aux : OUT matrix
 			) IS
-				VARIABLE out_of_bounds : BOOLEAN := TRUE;
 			BEGIN
-				WHILE out_of_bounds LOOP
-					out_of_bounds := FALSE;
-					FOR i IN 0 TO 3 LOOP
-						FOR j IN 0 TO 3 LOOP
-							IF piece_matrix(i, j) = '1' THEN
-
-								IF x_pos + j < 0 THEN
-									REPORT "Un bit de la pieza sale por la izquierda";
-									x_pos := x_pos + 1;
-									out_of_bounds := TRUE;
-
-								ELSIF x_pos + j >= 8 THEN
-									REPORT "Un bit de la pieza sale por la derecha";
-									x_pos := x_pos - 1;
-									out_of_bounds := TRUE;
-								
-								ELSIF y_pos + i >= 8 THEN
-								  REPORT "Un bit de la pieza ha llegado al final";
-								  y_pos := y_pos - 1;
-								  out_of_bounds := TRUE;
-									
-								END IF;
-								
-								
-							END IF;
-							EXIT WHEN out_of_bounds;
-						END LOOP;
-						EXIT WHEN out_of_bounds;
-					END LOOP;
-				END LOOP;
-
 				FOR i IN 0 TO 3 LOOP
 					FOR j IN 0 TO 3 LOOP
 						IF piece_matrix(i, j) = '1' THEN
 
 							IF ((x_pos + j >= 0 AND x_pos + j < 8) AND (y_pos + i >= 0 AND y_pos + i < 8)) THEN
 								board_aux(y_pos + i, x_pos + j) <= '1';
+								
+							ELSE 
+								REPORT "SALE DE LOS LIMITES, VERIFICAR DE QUE LADO SE SOBRE SALE";
+								
+								IF (x_pos + j < 0) THEN
+									REPORT "PIEZA SE SALE DEL BORDE IZQUIERDO";
+									x_pos := x_pos + 1;
+								ELSIF (x_pos + j > 7) THEN
+									REPORT "PIEZA SE SALE DEL BORDE DERECHO";
+									x_pos := x_pos - 1;
+								END IF;
+								
 							END IF;
 
 						END IF;
@@ -164,6 +153,40 @@ PACKAGE Functions IS
 				END LOOP;
 			END PROCEDURE;
 
+			FUNCTION canMoveRight (
+			   piece_matrix: IN Piece_Array; 
+			   x_pos: IN INTEGER; 
+			   y_pos: IN INTEGER; 
+			   board: IN matrix) RETURN BOOLEAN is
+				 VARIABLE new_x_pos: INTEGER := x_pos + 1; 
+			BEGIN
+
+				 FOR i IN 0 TO 3 LOOP
+					  FOR j IN 0 TO 3 LOOP
+							IF piece_matrix(i, j) = '1' THEN
+								 IF (new_x_pos + j > 7) THEN
+									  RETURN FALSE;
+								 END IF;
+							END IF;
+					  END LOOP;
+				 END LOOP;
+
+				 -- Verificar colisiones con otras piezas en el tablero al moverse hacia la derecha
+				 FOR i IN 0 TO 3 LOOP
+					  FOR j IN 0 TO 3 LOOP
+							IF piece_matrix(i, j) = '1' THEN
+								 IF board(y_pos + i, new_x_pos + j) = '1' THEN
+									  RETURN FALSE;
+								 END IF;
+							END IF;
+					  END LOOP;
+				 END LOOP;
+        
+          REPORT ("Puede moverse a la derecha");
+				 RETURN TRUE; 
+			END FUNCTION;
+
+
 			FUNCTION rotateLeft (piece_matrix : IN Piece_Array) RETURN Piece_Array is
 				VARIABLE rotated: Piece_Array;	
 			BEGIN
@@ -187,5 +210,36 @@ PACKAGE Functions IS
 
 				RETURN rotated;
 			END FUNCTION;
+			
+			PROCEDURE verifyLines (SIGNAL board: INOUT matrix; SIGNAL lines: INOUT INTEGER) IS
+        VARIABLE fila: STD_LOGIC_VECTOR(0 TO 7);
+      BEGIN      
+          FOR i IN 0 TO 7 LOOP
+          FOR j IN 0 TO 7 LOOP
+            fila(j) := board(i, j);
+          END LOOP;
+          
+          IF fila = "11111111" THEN
+            REPORT "Fila " & INTEGER'IMAGE(i) & " COMPLETA";
+            lines <= lines + 1;
+            
+            
+            FOR j IN 0 TO 7 LOOP
+                board(i, j) <= '0';
+            END LOOP;
+
+            FOR k IN i DOWNTO 1 LOOP
+                FOR j IN 0 TO 7 LOOP
+                    REPORT "Eliminando fila";
+                    board(k, j) <= board(k-1, j);
+                END LOOP;
+            END LOOP;
+
+            FOR j IN 0 TO 7 LOOP
+                board(0, j) <= '0';
+            END LOOP;
+          END IF;
+      END LOOP;
+  END PROCEDURE;
 
 			END PACKAGE BODY;

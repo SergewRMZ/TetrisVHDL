@@ -26,7 +26,7 @@ ARCHITECTURE Juego OF Tetris IS
 	TYPE State_Type IS (INIT, FALLING, SOLVE_COLLISION, GAME_OVER, NEXTFIGURE, ROTATION);
 	SIGNAL state : State_Type := INIT;
 
-	TYPE Action_State_Type IS (ESPERA, CLEAR, DRAW, CHARGE, DETECT_COLLISION, ROTATE_LEFT, ROTATE_RIGHT);
+	TYPE Action_State_Type IS (ESPERA, CLEAR, DRAW, CHARGE, DETECT_COLLISION, ROTATE_LEFT, ROTATE_RIGHT, VERIFY_LINES);
 	SIGNAL state_piece : Action_State_Type := ESPERA;
 
 	-- Matriz de Leds
@@ -39,9 +39,11 @@ ARCHITECTURE Juego OF Tetris IS
 	-- Clock Signals
 	SIGNAL shift_clock : STD_LOGIC := '0';
 	SIGNAL init_complete : BOOLEAN := false;
-	-- Señales de debouncer
+	-- Seï¿½ales de debouncer
 	SIGNAL right_debounced : STD_LOGIC := '0';
 	SIGNAL left_debounced : STD_LOGIC := '0';
+	
+	SIGNAL counter_lines : INTEGER := 0;
 
 	---------------------------------------------------------------------------------
 	-- COMPONENTES
@@ -115,6 +117,11 @@ BEGIN
 			chargePiece(board_aux, board);
 
 		ELSIF rising_edge(clk) THEN
+		
+			IF shift_clock = '1' THEN
+				 figure_y := figure_y + 1;
+			END IF;
+			
 			CASE state IS
 				WHEN INIT =>
 					state <= FALLING;
@@ -155,6 +162,7 @@ BEGIN
 							ELSE
 								state_piece <= ESPERA;
 							END IF;
+							
 						WHEN OTHERS => NULL;
 
 					END CASE;
@@ -186,18 +194,23 @@ BEGIN
 								state <= GAME_OVER;
 								REPORT "FIN DEL JUEGO";
 							END IF;
-							REPORT "Retrocede al último estado: figure_x=" & INTEGER'IMAGE(figure_x) & ", figure_y=" & INTEGER'IMAGE(figure_y) SEVERITY note;
+							REPORT "Retrocede al ultimo estado: figure_x=" & INTEGER'IMAGE(figure_x) & ", figure_y=" & INTEGER'IMAGE(figure_y) SEVERITY note;
 							clearMatAux(board_aux);
 							state_piece <= DRAW;
 
 						WHEN DRAW =>
 							draw_piece(current_piece, figure_x, figure_y, board_aux);
 							state_piece <= CHARGE;
-
+ 
 						WHEN CHARGE =>
 							chargePiece(board_aux, board);
-							state <= NEXTFIGURE;
-							state_piece <= CLEAR;
+							state_piece <= VERIFY_LINES;
+							
+						WHEN VERIFY_LINES => 
+						   REPORT "Verificar lineas";
+						   verifyLines(board, counter_lines);
+						   state <= NEXTFIGURE;
+							 state_piece <= CLEAR;
 
 						WHEN OTHERS => NULL;
 
@@ -227,18 +240,11 @@ BEGIN
 			END CASE;
 
 			IF right_btn = '1' THEN
-				IF figure_x < 7 THEN
-					figure_x := figure_x + 1;
-					REPORT "Derecha -> X = " & INTEGER'IMAGE(figure_x);
-				END IF;
-			END IF;
-
-			IF left_btn = '1' THEN
-				IF figure_x >- 2 THEN
-					figure_x := figure_x - 1;
-					REPORT "Izquierda <- X = " & INTEGER'IMAGE(figure_x);
-				END IF;
-			END IF;
+			   IF canMoveRight(current_piece, figure_x, figure_y, board) THEN
+				    figure_x := figure_x + 1;
+				  	 REPORT "Derecha -> X = " & INTEGER'IMAGE(figure_x);
+			   END IF;
+		  END IF;
 
 			IF rotate_right_btn = '1' THEN
 				state <= ROTATION;
@@ -247,18 +253,19 @@ BEGIN
 
 			IF rotate_left_btn = '1' THEN
 				state <= ROTATION;
-				state_piece <= ROTATE_LEFT;
 			END IF;
 			repaint(row_index, col_sel, row_sel, board);
 
-
-			
-		ELSIF rising_edge(shift_clock) THEN
-			figure_y := figure_y + 1;
-			REPORT "Pieza desciende";
 		END IF;
 	END PROCESS;
 
+  PROCESS(counter_lines) IS BEGIN
+    if counter_lines > 0 THEN
+      REPORT "Contando lineas " & INTEGER'IMAGE(counter_lines);
+    end if;
+  END PROCESS; 
+  
+  
 	clk_desp <= shift_clock;
-
+  
 END ARCHITECTURE Juego;
